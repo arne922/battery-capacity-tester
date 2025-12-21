@@ -1,4 +1,5 @@
 #include "core.h"
+#include <math.h>
 
 static const char* TAG = "CORE"; // For BT_LOG*
 
@@ -117,6 +118,8 @@ void Core::tick(uint32_t now_ms, const Telemetry& smTel) {
       if (aboveVStartMs_ == 0) aboveVStartMs_ = now_ms;
       const uint32_t held_ms = now_ms - aboveVStartMs_;
       if (held_ms >= cfg_.chargeHoldAbove_s * 1000UL) {
+        lastChargeWh_ = fabsf(phaseWh_);
+
         // Tell SM to switch to the opposite mode
         sm_.notifyPhaseDone();
 
@@ -147,6 +150,9 @@ void Core::tick(uint32_t now_ms, const Telemetry& smTel) {
     // Discharge stop condition:
     // voltage <= dischargeStopVoltage_V
     if (v <= cfg_.dischargeStopVoltage_V) {
+      
+      lastDischargeWh_ = fabsf(phaseWh_);
+
       sm_.notifyPhaseDone();
 
       phaseCount_++;

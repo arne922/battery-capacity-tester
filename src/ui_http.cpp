@@ -11,7 +11,6 @@
 
 static const char* TAG = "HTTP"; // For BT_LOG*
 
-
 static const char* kHtml = R"HTML(
 <!doctype html><html><head>
 <meta charset="utf-8"/>
@@ -27,6 +26,7 @@ pre{background:#f5f5f5;padding:10px;overflow:auto}
 .card{border:1px solid #ddd;border-radius:10px;padding:12px;min-width:260px}
 </style>
 </head><body>
+
 <h2>Battery Tester</h2>
 
 <!-- Run control -->
@@ -101,6 +101,7 @@ pre{background:#f5f5f5;padding:10px;overflow:auto}
 </div>
 
 <button onclick="saveConfig()">Save config</button>
+<div id="cfgStatus" style="margin-top:8px"></div>
 </fieldset>
 
 <script>
@@ -110,30 +111,55 @@ async function api(path, obj){
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify(obj)
   });
-  return await r.text();
+  const t = await r.text();
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${t}`);
+  return t; // z.B. "OK"
 }
 
 function modeVal(id){
   return document.getElementById(id).value;
 }
 
+function esc(x){
+  return String(x)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;");
+}
+
+function setCfgStatus(msg){
+  const el = document.getElementById('cfgStatus');
+  if (!el) return;
+  el.textContent = msg;
+}
+
+function applyConfigToForm(c){
+  if (c.cycles != null) document.getElementById('cycles').value = c.cycles;
+  if (c.startMode) document.getElementById('startMode').value = c.startMode;
+  if (c.stopMode) document.getElementById('stopMode').value = c.stopMode;
+
+  if (c.chargeStopVoltage_V != null) document.getElementById('chgV').value = c.chargeStopVoltage_V;
+  if (c.chargeStopHold_s != null) document.getElementById('chgHoldH').value = Number(c.chargeStopHold_s) / 3600;
+  if (c.waitChargeToDischarge_s != null) document.getElementById('wCD').value = c.waitChargeToDischarge_s;
+
+  if (c.dischargeStopVoltage_V != null) document.getElementById('dsgV').value = c.dischargeStopVoltage_V;
+  if (c.waitDischargeToCharge_s != null) document.getElementById('wDC').value = c.waitDischargeToCharge_s;
+}
+
 async function loadConfig(){
   try{
     const r = await fetch('/api/config');
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(`HTTP ${r.status}: ${t}`);
+    }
     const c = await r.json();
-
-    if (c.cycles != null) document.getElementById('cycles').value = c.cycles;
-    if (c.startMode) document.getElementById('startMode').value = c.startMode;
-    if (c.stopMode) document.getElementById('stopMode').value = c.stopMode;
-
-    if (c.chargeStopVoltage_V != null) document.getElementById('chgV').value = c.chargeStopVoltage_V;
-    if (c.chargeStopHold_s != null) document.getElementById('chgHoldH').value = (Number(c.chargeStopHold_s) / 3600);
-    if (c.waitChargeToDischarge_s != null) document.getElementById('wCD').value = c.waitChargeToDischarge_s;
-
-    if (c.dischargeStopVoltage_V != null) document.getElementById('dsgV').value = c.dischargeStopVoltage_V;
-    if (c.waitDischargeToCharge_s != null) document.getElementById('wDC').value = c.waitDischargeToCharge_s;
-
-  } catch(e){}
+    applyConfigToForm(c);
+    return c;
+  } catch(e){
+    // Optional: setCfgStatus("Load config error: " + e);
+    return null;
+  }
 }
 
 async function saveConfig(){
@@ -147,27 +173,73 @@ async function saveConfig(){
     dischargeStopVoltage_V: Number(document.getElementById('dsgV').value),
     waitDischargeToCharge_s: Number(document.getElementById('wDC').value)
   };
-  await api('/api/config', cfg);
+
+  setCfgStatus("Saving...");
+
+  try{
+    // 1) POST
+    await api('/api/config', cfg);
+
+    // optional: mini delay
+    await new Promise(res => setTimeout(res, 60));
+
+    // 2) GET (server truth) + apply
+    const c = await loadConfig();
+    if (!c) throw new Error("Saved, but failed to reload config");
+
+    setCfgStatus("Saved ✓ (confirmed from device)");
+  } catch(e){
+    setCfgStatus("Save error: " + e);
+  }
 }
 
 async function ctrl(cmd){
-  await api('/api/control', {cmd});
+  try{
+    await api('/api/control', {cmd});
+  } catch(e){
+    // Optional: could show this somewhere
+    console.log("Control error:", e);
+  }
 }
 
-function esc(x){
-  return String(x)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;");
+function fmtWh(v){
+  return Number(v).toFixed(2) + " Wh";
+}
+
+function pad2(n){
+  return String(n).padStart(2,'0');
+}
+
+function fmtUptime(ms){
+  ms = Number(ms) || 0;
+  const totalS = Math.floor(ms / 1000);
+  const days = Math.floor(totalS / 86400);
+  const rem = totalS % 86400;
+  const h = Math.floor(rem / 3600);
+  const m = Math.floor((rem % 3600) / 60);
+  const s = rem % 60;
+  return `${days}d, ${pad2(h)}:${pad2(m)}:${pad2(s)}`;
 }
 
 async function refresh(){
   try{
     const r = await fetch('/api/status');
-    const s = await r.json();
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(`HTTP ${r.status}: ${t}`);
+    }
+
+    const txt = await r.text();
+    let s;
+    try {
+      s = JSON.parse(txt);
+    } catch(e) {
+      throw new Error(`Invalid JSON: ${txt}`);
+    }
 
     const modeTxt = ["Idle","Charge","Discharge"][s.mode] ?? s.mode;
     const idleTxt = ["Ready","Done","Error","Stopped"][s.idleReason] ?? s.idleReason;
+    const uptimeTxt = fmtUptime(s.uptime_ms);
 
     document.getElementById('status').innerHTML = `
       <div class="row">
@@ -178,6 +250,12 @@ async function refresh(){
         <div class="card"><b>Idle Reas.</b><div>${esc(idleTxt)}</div></div>
         <div class="card"><b>Phase C.</b><div>${esc(s.phaseCount)}</div></div>
         <div class="card"><b>Current</b><div>${Number(s.current_A).toFixed(2)} A</div></div>
+
+        <div class="card"><b>Uptime</b><div>${uptimeTxt}</div></div>
+
+        <div class="card"><b>Energy (Last Charge)</b><div>${fmtWh(s.energy_last_charge_Wh)}</div></div>
+        <div class="card"><b>Energy (Last Discharge)</b><div>${fmtWh(s.energy_last_discharge_Wh)}</div></div>
+        <div class="card"><b>Energy (Current)</b><div>${fmtWh(s.energy_current_Wh)}</div></div>
       </div>
     `;
   } catch(e){
@@ -190,6 +268,7 @@ loadConfig();
 setInterval(refresh, 1000);
 refresh();
 </script>
+
 
 </body></html>
 )HTML";
@@ -246,6 +325,11 @@ void UiHttp::handleStatus() {
   // but ideally telemetry already contains those values.
   const float v = hw_.readVoltage_V();
   const float i = hw_.readCurrent_A();
+  const uint32_t up_ms = millis();
+
+  const float e_last_charge_Wh    = core_.lastChargeEnergy_Wh();
+  const float e_last_discharge_Wh = core_.lastDischargeEnergy_Wh();
+  const float e_current_Wh        = core_.currentEnergy_Wh();
 
   String json = "{";
   json += "\"mode\":" + String((int)t.mode) + ",";
@@ -253,7 +337,11 @@ void UiHttp::handleStatus() {
   json += "\"phaseCount\":" + String(t.phaseCount) + ",";
   json += "\"completedCycles\":" + String(t.completedCycles) + ",";
   json += "\"voltage_V\":" + String(v, 3) + ",";
-  json += "\"current_A\":" + String(i, 3);
+  json += "\"current_A\":" + String(i, 3) + ",";
+  json += "\"uptime_ms\":" + String(up_ms) + ",";
+  json += "\"energy_last_charge_Wh\":" + String(e_last_charge_Wh, 3) + ",";
+  json += "\"energy_last_discharge_Wh\":" + String(e_last_discharge_Wh, 3) + ",";
+  json += "\"energy_current_Wh\":" + String(e_current_Wh, 3);
   json += "}";
 
   server_.send(200, "application/json; charset=utf-8", json);

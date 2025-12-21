@@ -53,6 +53,9 @@ public:
   uint16_t cycleIndex1Based() const { return cycle1_; }      // 1..N (0 if Off)
   float phaseEnergy_Wh() const { return phaseWh_; }
   uint32_t phaseElapsed_s(uint32_t now_ms) const;
+  float lastChargeEnergy_Wh() const { return lastChargeWh_; }
+  float lastDischargeEnergy_Wh() const { return lastDischargeWh_; }
+  float currentEnergy_Wh() const { return phaseWh_; }
 
 private:
   Hw& hw_;
@@ -70,6 +73,9 @@ private:
   uint32_t phaseStartMs_ = 0;
   uint32_t lastEnergyMs_ = 0;
   float phaseWh_ = 0.0f;
+  float lastChargeWh_ = 0.0f;
+  float lastDischargeWh_ = 0.0f;
+
 
   // Charge stop: hold time above voltage threshold
   uint32_t aboveVStartMs_ = 0;
