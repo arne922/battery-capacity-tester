@@ -87,6 +87,14 @@ All user-adjustable parameters are centralized in `config.h`.
 Recommended environment: PlatformIO with Arduino framework  
 Target platform: ESP32-C3
 
+![Battery Tester Circuit](docs/Battery_Tester_Circuit.png)
+
+
+![ESP32 Wiring](docs/ESP_wiring.png)
+
+![Device under test](docs/test-1.jpg)
+
+
 ## Usage
 
 1. Power the device
