@@ -53,6 +53,8 @@ The web UI provides:
 - Start / Stop / Mode control
 - CSV download of logged measurement data
 
+![User Interface](docs/user_interface.png)
+
 ### Internal API
 
 The HTTP server exposes internal endpoints used by the UI:
