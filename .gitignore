@@ -42,3 +42,6 @@ include/secrets.h
 *~
 # other
 *.pptx
+*.pdf
+readme.txt
+.github/*
