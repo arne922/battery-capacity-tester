@@ -1,27 +1,33 @@
 #include <Arduino.h>
 #include <math.h>
 
+#include "config.h"
 #include "hw.h"
 
-
-Hw::Hw(const HwConfig& cfg)
-  : cfg_(cfg) {}
+#if HW_USE_INA219
+  #include <Wire.h>
+  #include <Adafruit_INA219.h>
+  static Adafruit_INA219 g_ina(INA219_ADDR);
+#endif
 
 void Hw::begin() {
-  // Configure GPIOs
-  if (cfg_.pinChargeEnable >= 0) {
-    pinMode(cfg_.pinChargeEnable, OUTPUT);
-  }
-  if (cfg_.pinDischargeEnable >= 0) {
-    pinMode(cfg_.pinDischargeEnable, OUTPUT);
-  }
 
-  // Ensure fail-safe state on boot
+#if HW_USE_RELAIS
+  if (PIN_CHARGE_ENABLE >= 0) pinMode(PIN_CHARGE_ENABLE, OUTPUT);
+  if (PIN_DISCHARGE_ENABLE >= 0) pinMode(PIN_DISCHARGE_ENABLE, OUTPUT);
+#endif
+
+#if HW_USE_INA219
+  initIna219_();
+#else
+  inaOk_ = false;
+#endif
+
   allOff();
 }
 
+
 void Hw::allOff() {
-  // Enforce interlock: never allow both paths at once
   writeCharge(false);
   writeDischarge(false);
   chargeOn_ = false;
@@ -29,7 +35,6 @@ void Hw::allOff() {
 }
 
 void Hw::startCharge() {
-  // Interlock: disable discharge before enabling charge
   writeDischarge(false);
   dischargeOn_ = false;
 
@@ -43,7 +48,6 @@ void Hw::stopCharge() {
 }
 
 void Hw::startDischarge() {
-  // Interlock: disable charge before enabling discharge
   writeCharge(false);
   chargeOn_ = false;
 
@@ -56,52 +60,89 @@ void Hw::stopDischarge() {
   dischargeOn_ = false;
 }
 
+void Hw::writeCharge(bool on) {
+
+#if HW_USE_RELAIS
+  if (PIN_CHARGE_ENABLE < 0) return;
+  const bool level = CHARGE_ACTIVE_HIGH ? on : !on;
+  digitalWrite(PIN_CHARGE_ENABLE, level ? HIGH : LOW);
+#endif
+}
+
+void Hw::writeDischarge(bool on) {
+#if HW_USE_RELAIS
+  if (PIN_DISCHARGE_ENABLE < 0) return;
+  const bool level = DISCHARGE_ACTIVE_HIGH ? on : !on;
+  digitalWrite(PIN_DISCHARGE_ENABLE, level ? HIGH : LOW);
+#endif
+}
+
 float Hw::readVoltage_V() const {
-#ifdef HW_SIM
+#if HW_SIM_MEASUREMENTS
   return readVoltageSim_V();
 #else
-  if (cfg_.pinAdcVoltage < 0) return NAN;
-  const float x = readAdcNormalized(cfg_.pinAdcVoltage);
-  return (x * cfg_.vScale) + cfg_.vOffset;
+#if HW_USE_INA219
+  if (inaOk_) return readVoltageIna_V_();
+#endif
+  if (PIN_ADC_VOLTAGE < 0) return NAN;
+  const float x = readAdcNormalized(PIN_ADC_VOLTAGE);
+  return x * V_SCALE + V_OFFSET;
 #endif
 }
 
 float Hw::readCurrent_A() const {
-#ifdef HW_SIM
+#if HW_SIM_MEASUREMENTS
   return readCurrentSim_A();
 #else
-  if (cfg_.pinAdcCurrent < 0) return NAN;
-  const float x = readAdcNormalized(cfg_.pinAdcCurrent);
-  return (x * cfg_.iScale) + cfg_.iOffset;
+#if HW_USE_INA219
+  if (inaOk_) return readCurrentIna_A_();
+#endif
+  if (PIN_ADC_CURRENT < 0) return NAN;
+  const float x = readAdcNormalized(PIN_ADC_CURRENT);
+  return x * I_SCALE + I_OFFSET;
 #endif
 }
 
-float Hw::readTemp_C() const {
-  if (cfg_.pinAdcTemp < 0) return NAN;
-  const float x = readAdcNormalized(cfg_.pinAdcTemp);
-  return (x * cfg_.tScale) + cfg_.tOffset;
-}
-
-void Hw::writeCharge(bool on) {
-  if (cfg_.pinChargeEnable < 0) return;
-  const bool level = cfg_.activeHighCharge ? on : !on;
-  digitalWrite(cfg_.pinChargeEnable, level ? HIGH : LOW);
-}
-
-void Hw::writeDischarge(bool on) {
-  if (cfg_.pinDischargeEnable < 0) return;
-  const bool level = cfg_.activeHighDischarge ? on : !on;
-  digitalWrite(cfg_.pinDischargeEnable, level ? HIGH : LOW);
-}
-
 float Hw::readAdcNormalized(int pin) const {
-  // Arduino analogRead() on ESP32 returns 0..4095 by default (12-bit),
-  // but configuration may differ. This keeps the abstraction small.
   const int raw = analogRead(pin);
   return (float)raw / 4095.0f;
 }
 
-#ifdef HW_SIM
+#if HW_USE_INA219
+
+void Hw::initIna219_() {
+  // allow "Arduino default pins" pattern if you set SDA/SCL to -1
+#if (INA_I2C_SDA >= 0) && (INA_I2C_SCL >= 0)
+  Wire.begin(INA_I2C_SDA, INA_I2C_SCL);
+#else
+  Wire.begin();
+#endif
+
+  inaOk_ = g_ina.begin();
+  if (!inaOk_) return;
+
+  switch (INA219_CAL_PRESET) {
+    default:
+    case 0: g_ina.setCalibration_32V_2A();    break;
+    case 1: g_ina.setCalibration_32V_1A();    break;
+    case 2: g_ina.setCalibration_16V_400mA(); break;
+  }
+}
+
+float Hw::readVoltageIna_V_() const {
+  return g_ina.getBusVoltage_V();
+}
+
+float Hw::readCurrentIna_A_() const {
+  return g_ina.getCurrent_mA() / 1000.0f;
+}
+
+#endif // HW_USE_INA219
+
+// ---------------------------
+// HW_SIM_MEASUREMENTS
+// ---------------------------
+#if HW_SIM_MEASUREMENTS
 
 float Hw::readVoltageSim_V() const {
   static float v = SIM_START_V;
@@ -117,7 +158,7 @@ float Hw::readVoltageSim_V() const {
   } else if (dischargeOn_ && !chargeOn_) {
     v -= SIM_DCHG_VPS * dt_s;
   } else {
-    // wait -> hold current voltage (no change)
+    // hold
   }
 
   if (v < SIM_V_MIN) v = SIM_V_MIN;
@@ -130,4 +171,5 @@ float Hw::readCurrentSim_A() const {
   if (dischargeOn_ && !chargeOn_) return SIM_I_DCHG_A;
   return SIM_I_IDLE_A;
 }
-#endif
+
+#endif // HW_SIM_MEASUREMENTS

@@ -16,15 +16,11 @@ I²C:
   GPIO9  → SCL (INA219)
 
 Relais:
-  GPIO6  → Relais IN1 (Laden)
-  GPIO7  → Relais IN2 (Entladen)
+  GPIO5  → Relais IN1 (Laden)
+  GPIO6  → Relais IN2 (Entladen)
 
 Reserve:
   GPIO2  → ADC (Spannung später, unbeschaltet)
-
-Optional:
-  GPIO10 → Status-LED
-  GPIO1  → Taster
 
 
 Schaltung:

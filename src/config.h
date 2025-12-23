@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "log.h"
+#include "hw.h"
 
 
 // =======================
@@ -26,10 +27,10 @@
 
 // How often the core logic samples voltage/current
 // (energy integration, stop conditions)
-inline constexpr uint32_t kCoreSampleInterval_s = 1;//15;
+inline constexpr uint32_t kCoreSampleInterval_s = 15;//15;
 
 // How often a row is stored into the log buffer (CSV resolution)
-inline constexpr uint32_t kLogStoreInterval_s = 2;//15 * 60; // 15 minutes
+inline constexpr uint32_t kLogStoreInterval_s = 15*60;//15 * 60; // 15 minutes
 
 
 // =======================
@@ -47,7 +48,7 @@ inline constexpr const char* kWifiStaSsid = "ToLo2";//"your-ssid";
 inline constexpr const char* kWifiStaPass = "einkaefer1200isteintollesauto124auch"; //your-password";
 
 // How long to wait for STA connection (ms)
-inline constexpr uint32_t kWifiStaTimeoutMs = 10000; // 10 s
+inline constexpr uint32_t kWifiStaTimeoutMs = 15000; // 10 s
 
 // AP fallback (always available if STA fails or is disabled)
 inline constexpr const char* kWifiApSsid = "BatteryTester";
@@ -74,7 +75,7 @@ struct ColDef {
 
 // Column order defines storage layout and CSV header.
 inline constexpr ColDef kLogSchema[] = {
-  {"Time_ms",   ColType::U32},
+  {"Time_s",    ColType::U32},
   {"Cycle",     ColType::U16},
   {"Phase",     ColType::U8},
   {"Status",    ColType::U8},
@@ -88,24 +89,49 @@ inline constexpr size_t kLogSchemaCols = sizeof(kLogSchema) / sizeof(kLogSchema[
 // RAM budget for log buffer (adjust as needed).
 inline constexpr size_t kLogRamBytes = 64 * 1024;
 
+
+// =======================
+//  HW config
+// =======================
+
+#define HW_USE_RELAIS          1  // 0 = off, 1 = on, can be switched off for testing
+
+// INA219
+#define HW_USE_INA219          1  // 0 = off, 1 = on
+
+#define INA219_ADDR            0x40
+#define INA_I2C_SDA            8
+#define INA_I2C_SCL            9
+#define INA219_CAL_PRESET      0 // 0=32V2A, 1=32V1A, 2=16V400mA
+
+// Outputs (Relais/MOSFET)
+#define PIN_CHARGE_ENABLE      5
+#define PIN_DISCHARGE_ENABLE   6
+
+#define CHARGE_ACTIVE_HIGH     0
+#define DISCHARGE_ACTIVE_HIGH  0
+
+// ADC fallback (optional, if INA219 not used or fails) ----------
+#define PIN_ADC_VOLTAGE        -1
+#define PIN_ADC_CURRENT        -1
+
+#define V_SCALE                1.0f
+#define V_OFFSET               0.0f
+#define I_SCALE                1.0f
+#define I_OFFSET               0.0f
+
 // =======================
 //  HW Simulation 
 // =======================
 
-#define HW_SIM
+#define HW_SIM_MEASUREMENTS    0  // 0 = off, 1 = on
 
-// Start at 12V
-static constexpr float SIM_START_V   = 12.0f;
+#define SIM_START_V   12.0f // start at 12V
+#define SIM_CHG_VPS   0.01f // gradients (V per second)
+#define SIM_DCHG_VPS  0.01f
+#define SIM_V_MIN     9.0f  // clamp (optional)
+#define SIM_V_MAX     14.6f
 
-// Gradienten (V per second)
-static constexpr float SIM_CHG_VPS   = 0.01f;
-static constexpr float SIM_DCHG_VPS  = 0.01f;
-
-// Clamp (optional)
-static constexpr float SIM_V_MIN     = 10.5f;
-static constexpr float SIM_V_MAX     = 14.8f;
-
-// Dummy-currents (A)
-static constexpr float SIM_I_CHG_A   = +2.0f;
-static constexpr float SIM_I_DCHG_A  = -2.0f;
-static constexpr float SIM_I_IDLE_A  = 0.0f;
+#define SIM_I_CHG_A   1.5f  // dummy-currents (A)
+#define SIM_I_DCHG_A  1.0f
+#define SIM_I_IDLE_A  0.02f

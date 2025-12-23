@@ -85,21 +85,7 @@ static void startWifi() {
 // Global objects (explicit wiring)
 
 // Hardware
-static HwConfig g_hwCfg;  // default values from struct
-
-static void initHwConfig() {
-  g_hwCfg.pinChargeEnable = 26;
-  g_hwCfg.pinDischargeEnable = 27;
-  g_hwCfg.activeHighCharge = true;
-  g_hwCfg.activeHighDischarge = true;
-  g_hwCfg.pinAdcVoltage = 34;
-  g_hwCfg.pinAdcCurrent = 35;
-  g_hwCfg.vScale = 20.0f;
-  g_hwCfg.iScale = 1.0f;
-}
-
-static Hw g_hw(g_hwCfg);
-
+static Hw g_hw;
 
 // State machine
 static StateMachine g_sm(g_hw);
@@ -160,7 +146,6 @@ void setup() {
 
   ESP_EARLY_LOGI(TAG, "System Starting");
 
-  initHwConfig();
   g_hw.begin();
 
   // Apply core config (later this will come from UI)
@@ -194,24 +179,27 @@ void loop() {
   }
 
 
+  if (g_core.runState() != RunState::Off) {
 
+    // Periodic data log row (content-free buffer: we push already computed values)
+    if (now - lastLogStoreMs >= kLogStoreInterval_s * 1000UL) {
+      lastLogStoreMs = now;
+      //BT_LOGV(TAG, "Log store at %lu ms", lastLogStoreMs);
 
-  // Periodic data log row (content-free buffer: we push already computed values)
-  if (now - lastLogStoreMs >= kLogStoreInterval_s * 1000UL) {
-    lastLogStoreMs = now;
-    //BT_LOGV(TAG, "Log store at %lu ms", lastLogStoreMs);
+      // Map runtime values to schema order (config.h).
+      ColValue row[kLogSchemaCols];
 
-    // Map runtime values to schema order (config.h).
-    ColValue row[kLogSchemaCols];
+      row[0].u32 = (now + 500) / 1000;                     // Time_s
+      row[1].u16 = g_core.cycleIndex1Based();              // Cycle
+      row[2].u8  = (uint8_t)g_core.phase();                // Phase
+      row[3].u8  = (uint8_t)g_core.runState();             // Status
+      row[4].f32 = g_hw.readVoltage_V();                   // U_V
+      row[5].f32 = g_hw.readCurrent_A();                   // I_A
+      row[6].f32 = g_core.phaseEnergy_Wh();                // Ephase_Wh
 
-    row[0].u32 = now;                                   // Time_ms
-    row[1].u16 = g_core.cycleIndex1Based();              // Cycle
-    row[2].u8  = (uint8_t)g_core.phase();                // Phase
-    row[3].u8  = (uint8_t)g_core.runState();             // Status
-    row[4].f32 = g_hw.readVoltage_V();                   // U_V
-    row[5].f32 = g_hw.readCurrent_A();                   // I_A
-    row[6].f32 = g_core.phaseEnergy_Wh();                // Ephase_Wh
-
-    g_log.store(row, kLogSchemaCols);
+      g_log.store(row, kLogSchemaCols);
+    }
   }
+  
+  delay(1); // yield to background tasks
 }

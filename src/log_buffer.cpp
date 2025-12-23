@@ -195,7 +195,7 @@ void LogBuffer::printCell_(Print& out, ColType t, const uint8_t* p) const {
       break;
 
     case ColType::F32:
-      out.print(readF32LE(p), 4);
+      out.print(readF32LE(p), 3); // 3 decimal places
       break;
   }
 }
