@@ -7,14 +7,14 @@
 #if HW_USE_INA219
   #include <Wire.h>
   #include <Adafruit_INA219.h>
-  static Adafruit_INA219 g_ina(INA219_ADDR);
+  static Adafruit_INA219 g_ina(kHwIna219Addr);
 #endif
 
 void Hw::begin() {
 
 #if HW_USE_RELAIS
-  if (PIN_CHARGE_ENABLE >= 0) pinMode(PIN_CHARGE_ENABLE, OUTPUT);
-  if (PIN_DISCHARGE_ENABLE >= 0) pinMode(PIN_DISCHARGE_ENABLE, OUTPUT);
+  if (kHwChargePin >= 0) pinMode(kHwChargePin, OUTPUT);
+  if (kHwDischargePin >= 0) pinMode(kHwDischargePin, OUTPUT);
 #endif
 
 #if HW_USE_INA219
@@ -63,17 +63,17 @@ void Hw::stopDischarge() {
 void Hw::writeCharge(bool on) {
 
 #if HW_USE_RELAIS
-  if (PIN_CHARGE_ENABLE < 0) return;
-  const bool level = CHARGE_ACTIVE_HIGH ? on : !on;
-  digitalWrite(PIN_CHARGE_ENABLE, level ? HIGH : LOW);
+  if (kHwChargePin < 0) return;
+  const bool level = kHwChargeActiveHigh ? on : !on;
+  digitalWrite(kHwChargePin, level ? HIGH : LOW);
 #endif
 }
 
 void Hw::writeDischarge(bool on) {
 #if HW_USE_RELAIS
-  if (PIN_DISCHARGE_ENABLE < 0) return;
-  const bool level = DISCHARGE_ACTIVE_HIGH ? on : !on;
-  digitalWrite(PIN_DISCHARGE_ENABLE, level ? HIGH : LOW);
+  if (kHwDischargePin < 0) return;
+  const bool level = kHwDischargeActiveHigh ? on : !on;
+  digitalWrite(kHwDischargePin, level ? HIGH : LOW);
 #endif
 }
 
@@ -84,9 +84,9 @@ float Hw::readVoltage_V() const {
 #if HW_USE_INA219
   if (inaOk_) return readVoltageIna_V_();
 #endif
-  if (PIN_ADC_VOLTAGE < 0) return NAN;
-  const float x = readAdcNormalized(PIN_ADC_VOLTAGE);
-  return x * V_SCALE + V_OFFSET;
+  if (kHwVoltageAdcPin < 0) return NAN;
+  const float x = readAdcNormalized(kHwVoltageAdcPin);
+  return x * kHwVoltageScale + kHwVoltageOffset;
 #endif
 }
 
@@ -97,9 +97,9 @@ float Hw::readCurrent_A() const {
 #if HW_USE_INA219
   if (inaOk_) return readCurrentIna_A_();
 #endif
-  if (PIN_ADC_CURRENT < 0) return NAN;
-  const float x = readAdcNormalized(PIN_ADC_CURRENT);
-  return x * I_SCALE + I_OFFSET;
+  if (kHwCurrentAdcPin < 0) return NAN;
+  const float x = readAdcNormalized(kHwCurrentAdcPin);
+  return x * kHwCurrentScale + kHwCurrentOffset;
 #endif
 }
 
@@ -113,7 +113,7 @@ float Hw::readAdcNormalized(int pin) const {
 void Hw::initIna219_() {
   // allow "Arduino default pins" pattern if you set SDA/SCL to -1
 #if (INA_I2C_SDA >= 0) && (INA_I2C_SCL >= 0)
-  Wire.begin(INA_I2C_SDA, INA_I2C_SCL);
+  Wire.begin(kHwInaI2cSdaPin, kHwInaI2cSclPin);
 #else
   Wire.begin();
 #endif
@@ -121,7 +121,7 @@ void Hw::initIna219_() {
   inaOk_ = g_ina.begin();
   if (!inaOk_) return;
 
-  switch (INA219_CAL_PRESET) {
+  switch (kHwInaCalPreset) {
     default:
     case 0: g_ina.setCalibration_32V_2A();    break;
     case 1: g_ina.setCalibration_32V_1A();    break;

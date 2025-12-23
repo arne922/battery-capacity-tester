@@ -4,21 +4,13 @@
 #include "log.h"
 #include "hw.h"
 
+#include "secrets.h" 
 
 // =======================
 // Logging configuration
 // =======================
 
-// Global default log level
-//#define CONFIG_LOG_MASTER_LEVEL BT_LOG_WARN
-//#define LOG_LEVEL_GLOBAL  BT_LOG_INFO
-//#define LOG_LEVEL_GLOBAL  BT_LOG_DEBUG
-//#define LOG_LEVEL_GLOBAL  BT_LOG_VERBOSE
-
-// Per-module overrides (comment out if not needed)
-//#define LOG_SM_DEBUG
-//#define LOG_CORE_DEBUG
-//#define LOG_HTTP_DEBUG
+#define BT_LOG_LEVEL 5   // 1=E,2=W,3=I,4=D,5=V
 
 
 // =======================
@@ -44,8 +36,10 @@ inline constexpr bool kWifiEnabled = true;
 inline constexpr bool kWifiUseSta = true;
 
 // STA credentials (leave empty to skip STA)
-inline constexpr const char* kWifiStaSsid = "ToLo2";//"your-ssid";
-inline constexpr const char* kWifiStaPass = "einkaefer1200isteintollesauto124auch"; //your-password";
+// --> see secrets.h for your own SSID/PASSWORD
+//inline constexpr const char* kWifiStaSsid = "your-ssid";
+//inline constexpr const char* kWifiStaPass = "your-password";
+  
 
 // How long to wait for STA connection (ms)
 inline constexpr uint32_t kWifiStaTimeoutMs = 15000; // 10 s
@@ -95,30 +89,33 @@ inline constexpr size_t kLogRamBytes = 64 * 1024;
 // =======================
 
 #define HW_USE_RELAIS          1  // 0 = off, 1 = on, can be switched off for testing
-
-// INA219
 #define HW_USE_INA219          1  // 0 = off, 1 = on
 
-#define INA219_ADDR            0x40
-#define INA_I2C_SDA            8
-#define INA_I2C_SCL            9
-#define INA219_CAL_PRESET      0 // 0=32V2A, 1=32V1A, 2=16V400mA
+// INA219 -------------------------------------------------------
+inline constexpr uint8_t  kHwIna219Addr       = 0x40;
+inline constexpr int      kHwInaI2cSdaPin     = 8;
+inline constexpr int      kHwInaI2cSclPin     = 9;
 
-// Outputs (Relais/MOSFET)
-#define PIN_CHARGE_ENABLE      5
-#define PIN_DISCHARGE_ENABLE   6
+// 0 = 32V/2A, 1 = 32V/1A, 2 = 16V/400mA
+inline constexpr uint8_t  kHwInaCalPreset = 0;
 
-#define CHARGE_ACTIVE_HIGH     0
-#define DISCHARGE_ACTIVE_HIGH  0
+// Outputs (Relais / MOSFET) -----------------------------------
+inline constexpr int kHwChargePin    = 5;
+inline constexpr int kHwDischargePin = 6;
 
-// ADC fallback (optional, if INA219 not used or fails) ----------
-#define PIN_ADC_VOLTAGE        -1
-#define PIN_ADC_CURRENT        -1
+inline constexpr bool kHwChargeActiveHigh    = false;
+inline constexpr bool kHwDischargeActiveHigh = false;
 
-#define V_SCALE                1.0f
-#define V_OFFSET               0.0f
-#define I_SCALE                1.0f
-#define I_OFFSET               0.0f
+// ADC fallback (optional) -------------------------------------
+inline constexpr int kHwVoltageAdcPin = -1;
+inline constexpr int kHwCurrentAdcPin = -1;
+
+// Calibration -------------------------------------------------
+inline constexpr float kHwVoltageScale  = 1.0f;
+inline constexpr float kHwVoltageOffset = 0.0f;
+inline constexpr float kHwCurrentScale  = 1.0f;
+inline constexpr float kHwCurrentOffset = 0.0f;
+
 
 // =======================
 //  HW Simulation 
@@ -126,12 +123,19 @@ inline constexpr size_t kLogRamBytes = 64 * 1024;
 
 #define HW_SIM_MEASUREMENTS    0  // 0 = off, 1 = on
 
-#define SIM_START_V   12.0f // start at 12V
-#define SIM_CHG_VPS   0.01f // gradients (V per second)
-#define SIM_DCHG_VPS  0.01f
-#define SIM_V_MIN     9.0f  // clamp (optional)
-#define SIM_V_MAX     14.6f
+// Simulation parameters --------------------------------------
+inline constexpr float SIM_START_V  = 12.0f;   // start at 12 V
 
-#define SIM_I_CHG_A   1.5f  // dummy-currents (A)
-#define SIM_I_DCHG_A  1.0f
-#define SIM_I_IDLE_A  0.02f
+// Voltage gradients (V per second)
+inline constexpr float kSimCharge_vps    = 0.01f;
+inline constexpr float kSimDischarge_vps = 0.01f;
+
+// Voltage limits (clamp)
+inline constexpr float kSimVmin    = 9.0f;
+inline constexpr float kSimVmax    = 14.6f;
+
+// Dummy currents (A)
+inline constexpr float kSimCurrentCharge_A    = 1.5f;
+inline constexpr float kSimCurrentDischarge_A = 1.0f;
+inline constexpr float kSimCurrentIdle_A      = 0.02f;
+
