@@ -53,7 +53,12 @@ The web UI provides:
 - Start / Stop / Mode control
 - CSV download of logged measurement data
 
-![User Interface](doc/user_interface.png)
+
+<figure align="center">
+<img src="doc/user_interface.png" style="max-width:800px; width:100%;">
+  <figcaption>User interface</figcaption>
+</figure>
+
 
 ### Internal API
 
@@ -89,13 +94,28 @@ All user-adjustable parameters are centralized in `config.h`.
 Recommended environment: PlatformIO with Arduino framework  
 Target platform: ESP32-C3
 
-![Battery Tester Circuit](doc/Battery_Tester_Circuit.png)
+<!--![Battery Tester Circuit](doc/Battery_Tester_Circuit.png) -->
+<figure align="center">
+  <img src="doc/Battery_Tester_Circuit.png" style="max-width:800px; width:100%;">
+  <figcaption>Circuit</figcaption>
+</figure>
+
+<figure align="center">
+  <img src="doc/ESP_wiring.png" style="max-width:800px; width:100%;">
+  <figcaption>ESP32 wiring</figcaption>
+</figure>
+
+<figure align="center">
+  <img src="doc/test-1.jpg" style="max-width:800px; width:100%;">
+  <figcaption>First test</figcaption>
+</figure>
 
 
-![ESP32 Wiring](/ESP_wiring.png)
+<!--
+![ESP32 Wiring](doc/ESP_wiring.png)
 
 ![Device under test](doc/test-1.jpg)
-
+-->
 
 ## Usage
 
